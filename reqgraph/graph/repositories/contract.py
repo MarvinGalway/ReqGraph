@@ -10,6 +10,15 @@ class ContractRepository(NodeRepository[Contract]):
     label = "Contract"
     model_cls = Contract
 
+    def _embedding_text(self, node: Contract) -> str | None:
+        parts = [
+            *node.preconditions,
+            *node.postconditions,
+            *node.invariants,
+            *[f"given {a.given} when {a.when} then {a.then}" for a in node.acceptance],
+        ]
+        return " ".join(parts) or None
+
     def behavioral_coverage(self, sess: Session, contract_id: str) -> tuple[int, int]:
         """Returns (validated_example_count, validated_edge_case_count) for a Contract.
 

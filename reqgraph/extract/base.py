@@ -30,14 +30,22 @@ class ExtractedImport:
     imports: str  # dotted module imported, at module granularity
 
 
+@dataclass(frozen=True)
+class ExtractedCall:
+    caller_symbol: str
+    callee_symbol: str  # intra-file only — resolved against symbols in the same extraction pass
+
+
 @dataclass
 class ExtractionResult:
     codeunits: list[ExtractedSymbol] = field(default_factory=list)
     tests: list[ExtractedTest] = field(default_factory=list)
     imports: list[ExtractedImport] = field(default_factory=list)
+    calls: list[ExtractedCall] = field(default_factory=list)
 
 
 class Extractor(Protocol):
     extensions: tuple[str, ...]
+    language: str
 
     def extract(self, path: str, source: str) -> ExtractionResult: ...

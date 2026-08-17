@@ -1,6 +1,7 @@
 """`bootstrap-observe` — spec §7 B1. Heuristic but mechanical: derives
-ObservedBehavior from each scanned Test's assert statements. No LLM call —
-this is "principalmente deterministico" evidence extraction, not inference.
+ObservedBehavior from each scanned Test's assert statements (`test` evidence)
+and each CodeUnit's docstring (`documentation` evidence). No LLM call — this
+is "principalmente deterministico" evidence extraction, not inference.
 """
 
 from __future__ import annotations
@@ -9,9 +10,10 @@ import ast
 from pathlib import Path
 
 from reqgraph.cli.common import console, graph_session, project_root
+from reqgraph.extract.python_ast import extract_symbol_docstring
 from reqgraph.graph.models import ObservedBehavior
 from reqgraph.graph.repositories import edges
-from reqgraph.graph.repositories.registry import observed_behaviors, tests
+from reqgraph.graph.repositories.registry import codeunits, observed_behaviors, tests
 from reqgraph.state import io as state_io
 from reqgraph.state.paths import bootstrap_state_path
 from reqgraph.state.schemas import BootstrapState
@@ -60,6 +62,31 @@ def run(repo_path: Path = Path(".")) -> None:
             )
             observed_behaviors.create(sess, observed)
             edges.evidences(sess, test_node.id, observed.id)
+            created += 1
+
+        all_codeunits = codeunits.list_all(sess)
+        for codeunit_node in all_codeunits:
+            if codeunit_node.kind not in ("function", "method"):
+                continue
+            if edges.outgoing_ids(sess, codeunit_node.id, "EVIDENCES"):
+                continue
+            try:
+                source = (repo_path / codeunit_node.path).read_text(encoding="utf-8")
+            except OSError:
+                continue
+            docstring = extract_symbol_docstring(codeunit_node.path, source, codeunit_node.symbol)
+            if not docstring:
+                continue
+            observed = ObservedBehavior(
+                given=f"{codeunit_node.symbol} as documented in {codeunit_node.path}",
+                when=f"{codeunit_node.symbol} is called",
+                observed=docstring,
+                evidence_type="documentation",
+                confidence="medium",
+                created_by="static-analysis",
+            )
+            observed_behaviors.create(sess, observed)
+            edges.evidences(sess, codeunit_node.id, observed.id)
             created += 1
 
     bootstrap_path = bootstrap_state_path(root)

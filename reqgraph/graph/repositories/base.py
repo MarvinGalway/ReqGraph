@@ -17,6 +17,7 @@ from neo4j import Session
 from pydantic import BaseModel
 
 from reqgraph.graph.models import BaseNode
+from reqgraph.llm.embeddings import get_embedding_provider
 
 T = TypeVar("T", bound=BaseNode)
 
@@ -55,7 +56,20 @@ class NodeRepository(Generic[T]):
     label: str
     model_cls: type[T]
 
+    def _embedding_text(self, node: T) -> str | None:
+        """Overridden by the 5 vector-eligible repos (Requirement, Contract,
+        Example, ObservedBehavior, Issue) to return the text that should be
+        embedded. Returning None (the default) means this label never gets
+        an embedding — correct for every other repo.
+        """
+        return None
+
     def create(self, sess: Session, node: T) -> T:
+        if node.embedding is None:
+            text = self._embedding_text(node)
+            provider = get_embedding_provider() if text else None
+            if provider is not None and text is not None:
+                node.embedding = provider.embed(text)
         props = to_neo4j_properties(node)
         sess.run(f"CREATE (n:{self.label} $props)", props=props)
         return node

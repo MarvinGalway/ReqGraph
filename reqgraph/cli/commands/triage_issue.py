@@ -1,7 +1,10 @@
 """`triage-issue <issue-id>` — spec §8. Classification/candidate-linking
-only; hard_rule: never authorizes modification. No vector search this pass
-(embeddings deferred) — candidates come from the Issue's existing graph
-neighborhood (AFFECTS/VIOLATES/EXPLAINED_BY/FOUND_DURING).
+only; hard_rule: never authorizes modification. Candidates come from the
+Issue's graph neighborhood (AFFECTS/VIOLATES/EXPLAINED_BY/FOUND_DURING) plus,
+when the `embeddings` extra + vector indexes are available, similar
+Contracts and similar Issues (the latter is a real duplicate-detection
+capability the graph-neighborhood-only version couldn't offer) found via
+vector search — purely additional context for the LLM, never authorization.
 """
 
 from __future__ import annotations
@@ -11,6 +14,8 @@ import typer
 from reqgraph.cli.common import console, graph_session, project_root
 from reqgraph.graph.repositories import edges
 from reqgraph.graph.repositories.registry import issues
+from reqgraph.graph.vector_search import vector_search
+from reqgraph.llm.embeddings import get_embedding_provider
 from reqgraph.llm.invoke import invoke_role
 from reqgraph.llm.prompts import issue_triage
 from reqgraph.llm.roles import ROLES
@@ -31,6 +36,14 @@ def run(issue_id: str) -> None:
         for edge_type in ("AFFECTS", "VIOLATES", "EXPLAINED_BY", "FOUND_DURING"):
             for target_id in edges.outgoing_ids(sess, issue_id, edge_type):
                 neighborhood_lines.append(f"{edge_type} -> {target_id}")
+
+        provider = get_embedding_provider()
+        if provider is not None:
+            query_vector = provider.embed(f"{issue.title} {issue.description}")
+            for contract_id, score in vector_search(sess, "Contract", query_vector, k=3):
+                neighborhood_lines.append(f"VECTOR_SIMILAR_CONTRACT -> {contract_id} (score={score:.3f})")
+            for similar_id, score in vector_search(sess, "Issue", query_vector, k=3, exclude_id=issue_id):
+                neighborhood_lines.append(f"VECTOR_SIMILAR_ISSUE -> {similar_id} (score={score:.3f})")
 
         output: IssueTriageOutput = invoke_role(
             ROLES["issue_triage"],

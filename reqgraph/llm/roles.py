@@ -1,8 +1,12 @@
 """Role config mirroring models-config-v0.2.json's `roles` block.
 
-`codegen` and `reviewer` are intentionally omitted — the autonomous
-Codegen/Reviewer TDD loop is out of scope for this pass (see implementation
-plan). Every other role from the spec is represented.
+`codegen` is intentionally omitted — per the confirmed architecture, Codegen
+is an external agent (Claude Code, OpenCode, a human), not an LLM role
+graph-cli invokes itself; graph-cli only gates/records around it (see G3
+implementation plan). `reviewer` IS represented despite that, because it's
+graph-cli's own automated fidelity check on `complete`, structurally
+separate from whatever agent wrote the code — the spec's "must differ from
+codegen" rule is satisfied by construction, not by model selection.
 
 **Deviation from the literal JSON (documented, not silent):** the JSON's
 per-role `temperature` values are incompatible with current-generation
@@ -95,6 +99,15 @@ ROLES: dict[str, RoleConfig] = {
         profile="small/economic, high volume",
         default_model="claude-haiku-4-5-20251001",
         temperature=0.0,
+    ),
+    "reviewer": RoleConfig(
+        name="reviewer",
+        pipeline="shared",
+        purpose="implementation<->contract<->requirement fidelity and regression review",
+        profile="medium-high reasoning",
+        default_model="claude-opus-5",
+        effort="medium",
+        hard_rule="reports fidelity issues; does not authorize further modification",
     ),
 }
 

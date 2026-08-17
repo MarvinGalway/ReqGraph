@@ -152,3 +152,15 @@ class IssueTriageOutput(BaseModel):
     candidate_contract_ids: list[str] = Field(default_factory=list)
     candidate_codeunit_ids: list[str] = Field(default_factory=list)
     candidate_configunit_ids: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# reviewer — complete's fidelity gate
+# ---------------------------------------------------------------------------
+
+
+class ReviewerOutput(BaseModel):
+    verdict: Literal["pass", "fail"]
+    contract_fidelity_notes: str
+    requirement_fidelity_notes: str
+    concerns: list[str] = Field(default_factory=list)

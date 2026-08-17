@@ -22,6 +22,10 @@ def run(
     with_vector: Annotated[
         bool, typer.Option("--with-vector", help="Also create vector indexes (embeddings deferred otherwise)")
     ] = False,
+    test_command: Annotated[
+        str | None,
+        typer.Option(help="Shell command to run the target repo's test suite, e.g. 'pytest'"),
+    ] = None,
 ) -> None:
     if mode not in ("greenfield", "existing-project"):
         raise typer.BadParameter("mode must be 'greenfield' or 'existing-project'")
@@ -30,7 +34,7 @@ def run(
     with graph_session() as sess:
         applied = apply_schema(sess, with_vector=with_vector)
 
-    project_file = ProjectFile(project=project, project_mode=mode)
+    project_file = ProjectFile(project=project, project_mode=mode, test_command=test_command)
     state_io.write_json(project_json_path(root), project_file.model_dump(mode="json"))
 
     todo_global = TodoGlobal(project=project, project_mode=mode)
@@ -47,3 +51,10 @@ def run(
     console.print(f"[green]Initialized ReqGraph project[/green] '{project}' (mode={mode}).")
     console.print(f"Applied {len(applied)} schema statements to Neo4j.")
     console.print(f"Project state at {root / '.project-state'}")
+    if test_command:
+        console.print(f"test_command = {test_command!r}")
+    else:
+        console.print(
+            "[yellow]No --test-command set — `run-task --verify-red` and `complete` will "
+            "require --test-command explicitly until you set one.[/yellow]"
+        )

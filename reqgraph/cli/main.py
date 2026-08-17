@@ -10,6 +10,7 @@ from reqgraph.cli.commands import (
     bootstrap_observe,
     bootstrap_review,
     bootstrap_scan,
+    close_phase,
     complete,
     consistency_check,
     derive_tasks,
@@ -47,6 +48,7 @@ greenfield_app.command("derive-tasks")(derive_tasks.run)
 greenfield_app.command("context")(context_cmd.run)
 greenfield_app.command("run-task")(run_task.run)
 greenfield_app.command("complete")(complete.run)
+greenfield_app.command("close-phase")(close_phase.run)
 
 # Legacy bootstrap
 legacy_app.command("bootstrap-scan")(bootstrap_scan.run)
@@ -70,5 +72,23 @@ app.add_typer(legacy_app)
 app.add_typer(maintenance_app)
 
 
+def main() -> None:
+    """Entry point used by the installed `graph-cli` console script.
+
+    Catches expected, actionable RuntimeErrors (e.g. `ANTHROPIC_API_KEY` not
+    set — every LLM-backed command can hit this) and prints them the same
+    clean way as a `typer.BadParameter`, instead of a raw traceback. This
+    matters beyond cosmetics: docs/AGENT_INTEGRATION.md's contract is "read
+    stdout for the reason on a non-zero exit" — a traceback isn't that.
+    """
+    try:
+        app()
+    except RuntimeError as e:
+        from reqgraph.cli.common import console
+
+        console.print(f"[red]{e}[/red]")
+        raise SystemExit(1) from e
+
+
 if __name__ == "__main__":
-    app()
+    main()

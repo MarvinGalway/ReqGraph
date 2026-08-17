@@ -11,6 +11,9 @@ class RequirementRepository(NodeRepository[Requirement]):
     label = "Requirement"
     model_cls = Requirement
 
+    def _embedding_text(self, node: Requirement) -> str | None:
+        return node.text
+
     def create_version(
         self, sess: Session, new_requirement: Requirement, supersedes_id: str
     ) -> Requirement:

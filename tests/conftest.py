@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 import pytest
+
+FIXTURE_REPO = Path(__file__).parent / "fixtures" / "sample_repo"
+FIXTURE_REPO_JS = Path(__file__).parent / "fixtures" / "sample_repo_js"
 
 from reqgraph.config import reset_settings_cache
 from reqgraph.graph import driver as driver_module
@@ -44,6 +48,26 @@ def neo4j_session():
 @pytest.fixture
 def project_root(tmp_path) -> Path:
     return tmp_path
+
+
+@pytest.fixture
+def target_repo(tmp_path) -> Path:
+    """A throwaway copy of the orders.py/test_orders.py fixture repo (spec
+    §15 Slice B) for commands that read/run code from a target repository.
+    """
+    dest = tmp_path / "target_repo"
+    shutil.copytree(FIXTURE_REPO, dest)
+    return dest
+
+
+@pytest.fixture
+def target_repo_js(tmp_path) -> Path:
+    """A throwaway copy of the orders.js/orders.test.js fixture repo, the
+    JS/TS mirror of `target_repo`, for cross-language extraction tests.
+    """
+    dest = tmp_path / "target_repo_js"
+    shutil.copytree(FIXTURE_REPO_JS, dest)
+    return dest
 
 
 class FakeParsedMessage:

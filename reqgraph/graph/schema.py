@@ -1,8 +1,10 @@
 """Schema DDL: per-label uniqueness constraints and (optional) vector indexes.
 
-Vector indexes are opt-in (`with_vector=True`) because embeddings are
-deferred in this pass — see `reqgraph/llm/embeddings.py`. Without them the
-system runs on deterministic graph traversal only.
+Vector indexes are opt-in (`with_vector=True`, or `init --with-vector`).
+Embedding computation itself (see `reqgraph/llm/embeddings.py`) is fully
+optional too — the `embeddings` extra (`fastembed`, local/offline, no API
+key) — so the system runs correctly on deterministic graph traversal alone
+whenever either piece isn't installed/enabled.
 """
 
 from __future__ import annotations
@@ -15,7 +17,8 @@ from reqgraph.graph.models import NODE_LABELS
 # models-config-v0.2.json -> retrieval.vector_index.nodes
 VECTOR_INDEX_LABELS = ("Requirement", "Contract", "Example", "ObservedBehavior", "Issue")
 
-DEFAULT_EMBEDDING_DIMENSIONS = 1024
+# Matches fastembed's default local model, BAAI/bge-small-en-v1.5 (384 dims).
+DEFAULT_EMBEDDING_DIMENSIONS = 384
 DEFAULT_SIMILARITY_FUNCTION = "cosine"
 
 

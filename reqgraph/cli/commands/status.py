@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+from typing import Annotated
+
+import typer
 from rich.table import Table
 
 from reqgraph.cli.common import console, graph_session, project_root
@@ -7,12 +11,17 @@ from reqgraph.state import io as state_io
 from reqgraph.state.paths import todo_global_path
 
 
-def run() -> None:
+def run(
+    as_json: Annotated[bool, typer.Option("--json", help="Emit machine-readable JSON instead of a table")] = False,
+) -> None:
     root = project_root()
     todo_path = todo_global_path(root)
     if not todo_path.exists():
-        console.print("[red]No ReqGraph project here — run `graph-cli init` first.[/red]")
-        raise SystemExit(1)
+        if as_json:
+            console.print_json(json.dumps({"error": "no ReqGraph project here — run `graph-cli init` first"}))
+        else:
+            console.print("[red]No ReqGraph project here — run `graph-cli init` first.[/red]")
+        raise typer.Exit(code=1)
     todo_global = state_io.read_json(todo_path)
 
     with graph_session() as sess:
@@ -38,6 +47,23 @@ def run() -> None:
         needs_revalidation = sess.run(
             "MATCH (n) WHERE n.verification_status = 'needs_revalidation' RETURN count(n) AS n"
         ).single()["n"]
+
+    if as_json:
+        payload = {
+            "project": todo_global.get("project"),
+            "project_mode": todo_global.get("project_mode"),
+            "current_phase": todo_global.get("current_phase"),
+            "node_counts": counts,
+            "open_issues": open_issues,
+            "open_contradictions": open_contradictions,
+            "needs_revalidation": needs_revalidation,
+            "stale_nodes_count": todo_global.get("stale_nodes_count", 0),
+            "last_regression": todo_global.get("last_regression"),
+            "open_assumptions": todo_global.get("open_assumptions", []),
+            "phases": todo_global.get("phases", []),
+        }
+        console.print_json(json.dumps(payload))
+        return
 
     console.print(f"[bold]Project:[/bold] {todo_global.get('project')} ({todo_global.get('project_mode')})")
     console.print(f"[bold]Current phase:[/bold] {todo_global.get('current_phase') or '(none)'}")

@@ -30,6 +30,9 @@ class ProjectFile(BaseModel):
     project_mode: Literal["greenfield", "existing-project"] = "greenfield"
     created_at: datetime = Field(default_factory=now)
     reqgraph_version: str = REQGRAPH_VERSION
+    # Shell command used by `run-task --verify-red` and `complete`'s regression
+    # gate to actually run the target repo's test suite (e.g. "pytest").
+    test_command: str | None = None
 
 
 # ---------------------------------------------------------------------------
