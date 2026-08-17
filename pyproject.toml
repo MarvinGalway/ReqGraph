@@ -1,0 +1,38 @@
+[project]
+name = "reqgraph"
+version = "0.1.0"
+description = "ReqGraph graph-cli — semantic traceability knowledge graph CLI"
+requires-python = ">=3.11"
+dependencies = [
+  "neo4j>=5.24",
+  "anthropic>=0.68",
+  "typer>=0.12",
+  "pydantic>=2.8",
+  "pydantic-settings>=2.4",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-mock", "ruff", "mypy", "freezegun"]
+
+[project.scripts]
+graph-cli = "reqgraph.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reqgraph"]
+
+[tool.pytest.ini_options]
+markers = [
+  "integration: requires a live Neo4j instance (docker compose up -d neo4j)",
+  "live_api: requires a real ANTHROPIC_API_KEY, hits the real Anthropic API",
+]
+testpaths = ["tests"]
+norecursedirs = ["tests/fixtures"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

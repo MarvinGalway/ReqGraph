@@ -1,0 +1,18 @@
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-reqgraph-dev}
+    ports:
+      - "7474:7474" # browser, dev convenience
+      - "7687:7687" # bolt — this is what reqgraph talks to
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-O", "/dev/null", "http://localhost:7474"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  neo4j_data:

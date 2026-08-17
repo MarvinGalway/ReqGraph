@@ -1,0 +1,203 @@
+{
+  "$schema_note": "ReqGraph v0.2 operational state templates. Neo4j is the relation/source-of-traceability; these files are agent/session state.",
+  "version": "0.2",
+  "todo_global_template": {
+    "file": "/.project-state/todo-global.json",
+    "project": "string",
+    "project_mode": "greenfield | existing-project",
+    "current_phase": "string",
+    "phases": [
+      {
+        "id": "phase-01",
+        "title": "string",
+        "status": "in_progress",
+        "tasks_done": 0,
+        "tasks_total": 0
+      }
+    ],
+    "open_assumptions": [
+      {
+        "assumption_id": "uuid",
+        "text": "string",
+        "blocking_tasks": [
+          "task-id"
+        ]
+      }
+    ],
+    "open_contradictions": [
+      {
+        "edge_id": "uuid",
+        "between": [
+          "node-id",
+          "node-id"
+        ],
+        "summary": "string"
+      }
+    ],
+    "open_issues": [
+      {
+        "issue_id": "uuid",
+        "classification": "unknown",
+        "blocking_tasks": [
+          "task-id"
+        ]
+      }
+    ],
+    "stale_nodes_count": 0,
+    "needs_revalidation_count": 0,
+    "last_regression": {
+      "at": "ISO-8601",
+      "result": "green | red | unknown"
+    },
+    "bootstrap": {
+      "status": "not_applicable | scanning | inferring | human_review | complete",
+      "coverage": 0.0
+    }
+  },
+  "todo_phase_template": {
+    "file": "/.project-state/phases/phase-NN/todo-phase.json",
+    "phase_id": "phase-01",
+    "title": "string",
+    "goal": "string",
+    "exit_criteria": [
+      "consistency-check green",
+      "target regression green",
+      "blocking assumptions resolved or explicitly carried",
+      "blocking issues resolved or explicitly carried",
+      "no unresolved needs_revalidation for phase scope"
+    ],
+    "tasks": [
+      {
+        "id": "task-01-01",
+        "title": "string",
+        "status": "todo",
+        "depends_on": [],
+        "blocked_reason": null
+      }
+    ]
+  },
+  "task_file_template": {
+    "file": "/.project-state/phases/phase-NN/tasks/task-NN-NN.json",
+    "id": "task-01-01",
+    "title": "string",
+    "status": "todo | in_progress | blocked | done | stale",
+    "contract_refs": [
+      "contract-uuid"
+    ],
+    "requirement_refs": [
+      "requirement-uuid"
+    ],
+    "examples_assigned": [
+      "example-uuid"
+    ],
+    "issues_addressed": [
+      "issue-uuid"
+    ],
+    "depends_on": [
+      "task-id"
+    ],
+    "scope": {
+      "target_codeunits": [
+        "codeunit-uuid"
+      ],
+      "target_configunits": [
+        "configunit-uuid"
+      ],
+      "allowed_paths": [
+        "glob"
+      ],
+      "out_of_scope_policy": "report_issue_do_not_modify"
+    },
+    "definition_of_done": {
+      "tests": [
+        "test path/symbol"
+      ],
+      "regression": "relevant/full suite green as configured",
+      "fidelity_check": "reviewer confirms implementation<->contract<->requirement",
+      "impact_check": "all directly affected contracts evaluated"
+    },
+    "tdd_loop_state": {
+      "step": "write-tests | verify-red | implement | impact-check | fidelity-check | regression | update-state",
+      "tests_verified_red": false,
+      "notes": "string"
+    },
+    "artifacts_generated": {
+      "codeunits": [
+        "codeunit-uuid"
+      ],
+      "configunits": [
+        "configunit-uuid"
+      ],
+      "tests": [
+        "test-uuid"
+      ]
+    },
+    "out_of_scope_findings": [
+      {
+        "issue_id": "uuid",
+        "summary": "string"
+      }
+    ],
+    "decisions": [
+      {
+        "choice": "string",
+        "rationale": "string",
+        "at": "ISO-8601"
+      }
+    ],
+    "assumptions_raised": [
+      {
+        "text": "string",
+        "graph_node": "assumption-uuid | null",
+        "status": "open"
+      }
+    ],
+    "clarifications_opened": [
+      "clarification-uuid"
+    ]
+  },
+  "issue_file_template": {
+    "file": "/.project-state/issues/issue-<id>.json",
+    "issue_id": "uuid",
+    "workflow_status": "open",
+    "classification": "unknown",
+    "reported_by": "human | llm:<model> | test | bootstrap",
+    "found_during_task": "task-id | null",
+    "evidence": [],
+    "candidate_contracts": [],
+    "candidate_codeunits": [],
+    "candidate_configunits": [],
+    "human_decision": "pending | investigate | backlog | resolve | reject | expected_behavior",
+    "authorized_task": "task-id | null"
+  },
+  "bootstrap_state_template": {
+    "file": "/.project-state/bootstrap/bootstrap-state.json",
+    "mode": "existing-project",
+    "stage": "scan | observe | infer | human_review | complete",
+    "repository_revision": "git commit/hash",
+    "counts": {
+      "codeunits": 0,
+      "configunits": 0,
+      "tests": 0,
+      "observed_behaviors": 0,
+      "candidate_contracts": 0,
+      "candidate_requirements": 0,
+      "validated_contracts": 0,
+      "validated_requirements": 0
+    },
+    "review_queue": [
+      "node-id"
+    ]
+  },
+  "session_resume_protocol": {
+    "load": [
+      "todo-global.json compressed",
+      "current phase todo",
+      "current task file",
+      "blocking/open Issue files for current task",
+      "balanced graph context bundle",
+      "changed CodeUnit/ConfigUnit impact bundle when revalidation is active"
+    ],
+    "every_item_labeled_with_knowledge_and_verification_status": true
+  }
+}

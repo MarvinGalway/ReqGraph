@@ -1,0 +1,124 @@
+{
+  "$schema_note": "ReqGraph v0.2 role/model configuration. Model ids remain deployment placeholders.",
+  "version": "0.2",
+  "roles": {
+    "critic": {
+      "pipeline": "greenfield",
+      "purpose": "attack requirements: ambiguity, gaps, contradictions, edge cases",
+      "profile": "strong reasoning, broad context",
+      "model": "<reasoning-model-id>",
+      "temperature": 0.7
+    },
+    "formalizer": {
+      "pipeline": "greenfield + legacy",
+      "purpose": "contracts and behavioral examples; candidate specs in legacy mode",
+      "profile": "strong reasoning",
+      "model": "<reasoning-model-id>",
+      "temperature": 0.3
+    },
+    "planner": {
+      "pipeline": "shared",
+      "purpose": "derive authorized tasks from validated contracts/issues",
+      "profile": "reasoning",
+      "model": "<reasoning-model-id>",
+      "temperature": 0.2
+    },
+    "codegen": {
+      "pipeline": "shared",
+      "purpose": "generate tests and authorized implementation changes",
+      "profile": "coding; constrained by validated contracts/examples and task scope",
+      "model": "<coding-model-id>",
+      "temperature": 0.2,
+      "opencode_agent": "coder",
+      "hard_rule": "out-of-scope findings become Issue; do not modify without authorization"
+    },
+    "reviewer": {
+      "pipeline": "shared",
+      "purpose": "implementation<->contract<->requirement fidelity and regression review",
+      "profile": "medium-high reasoning",
+      "model": "<different-from-codegen>",
+      "constraint": "must differ from codegen",
+      "temperature": 0.2
+    },
+    "librarian": {
+      "pipeline": "shared",
+      "purpose": "graph extraction/update, embeddings, todo compression, provenance",
+      "profile": "small/economic, high volume",
+      "model": "<small-model-id>",
+      "temperature": 0.0
+    },
+    "reverse_analyst": {
+      "pipeline": "existing-project bootstrap",
+      "purpose": "infer ObservedBehavior and candidate behavioral/semantic knowledge from repository evidence",
+      "profile": "strong reasoning + code understanding",
+      "model": "<reasoning-code-model-id>",
+      "temperature": 0.2,
+      "hard_rule": "never mark inferred intent as validated"
+    },
+    "impact_analyst": {
+      "pipeline": "maintenance",
+      "purpose": "evaluate semantic impact of changed CodeUnit/ConfigUnit on candidate contracts",
+      "profile": "strong reasoning + diff/code understanding",
+      "model": "<reasoning-code-model-id>",
+      "temperature": 0.1,
+      "hard_rule": "candidate selection starts from deterministic graph/static analysis; analyst does not silently shrink the safety set"
+    },
+    "issue_triage": {
+      "pipeline": "shared",
+      "purpose": "assist Issue classification, evidence gathering and candidate links",
+      "profile": "reasoning",
+      "model": "<reasoning-model-id>",
+      "temperature": 0.2,
+      "hard_rule": "classification does not authorize code modification"
+    }
+  },
+  "retrieval": {
+    "strategy": "hybrid vector entry-point + typed traversal + provenance/status filtering + balancing",
+    "vector_index": {
+      "nodes": [
+        "Requirement",
+        "Contract",
+        "Example",
+        "ObservedBehavior",
+        "Issue"
+      ],
+      "property": "embedding",
+      "stale_penalty_multiplier": 0.5
+    },
+    "task_traversal_rules": [
+      "Task -> DERIVES_FROM -> Contract -> FORMALIZES -> Requirement",
+      "Contract <- WITNESSES <- Example",
+      "Task -> ADDRESSES -> Issue",
+      "CodeUnit|ConfigUnit|Test -> GENERATED_BY -> Task",
+      "Test -> GENERATED_FROM -> Example",
+      "CodeUnit -> IMPLEMENTS -> Contract",
+      "ConfigUnit -> CONSTRAINS -> Contract",
+      "* -> CONTRADICTS -> * and related Assumption/Clarification"
+    ],
+    "impact_traversal_rules": [
+      "changed CodeUnit|ConfigUnit -> IMPLEMENTS|CONSTRAINS -> Contract",
+      "changed CodeUnit|ConfigUnit <- TESTS <- Test",
+      "changed CodeUnit|ConfigUnit -> DEPENDS_ON and reverse DEPENDS_ON, bounded",
+      "candidate contracts -> FORMALIZES -> Requirement",
+      "do not invalidate merely because nodes share a path/file"
+    ],
+    "context_budget_quotas": {
+      "contracts_and_requirements": 0.28,
+      "validated_examples": 0.22,
+      "constraints_assumptions_issues": 0.18,
+      "implementation_and_dependency_interfaces": 0.17,
+      "state_todo_decisions": 0.1,
+      "observed_evidence": 0.05
+    },
+    "status_labels_in_context": [
+      "[OBSERVED]",
+      "[INFERRED]",
+      "[GENERATED]",
+      "[VALIDATED]",
+      "[DISPUTED]",
+      "[STALE]",
+      "[NEEDS_REVALIDATION]",
+      "[FAILED]"
+    ]
+  }
+}

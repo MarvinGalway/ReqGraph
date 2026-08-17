@@ -1,0 +1,413 @@
+{
+  "$schema_note": "ReqGraph v0.2 logical schema. Neo4j implementation may normalize some fields into relationships/nodes.",
+  "version": "0.2",
+  "common_node_fields": {
+    "id": "uuid",
+    "knowledge_status": "observed | inferred | generated | validated | disputed | stale",
+    "verification_status": "not_applicable | unknown | needs_revalidation | verified | failed",
+    "created_by": "human | llm:<model-id> | static-analysis | import:<source>",
+    "created_at": "ISO-8601",
+    "updated_at": "ISO-8601",
+    "source_refs": [
+      "string"
+    ],
+    "embedding": "float[] | null"
+  },
+  "categories": {
+    "intent_and_semantics": [
+      "Requirement",
+      "Clarification",
+      "Assumption"
+    ],
+    "behavioral_specification": [
+      "Contract",
+      "Example"
+    ],
+    "planning_and_orchestration": [
+      "Task"
+    ],
+    "implementation_and_verification": [
+      "CodeUnit",
+      "ConfigUnit",
+      "Test"
+    ],
+    "quality_and_investigation": [
+      "Issue"
+    ],
+    "observed_evidence": [
+      "ObservedBehavior"
+    ]
+  },
+  "nodes": {
+    "Requirement": {
+      "text": "immutable prose for this version",
+      "source": "person | document | ticket | reverse-engineered",
+      "trust": "external-unverified | external-verified | human-validated",
+      "origin_mode": "greenfield | legacy-bootstrap"
+    },
+    "Clarification": {
+      "question": "string",
+      "answer": "string | null",
+      "answered_by": "string | null",
+      "blocking": "boolean"
+    },
+    "Assumption": {
+      "text": "string",
+      "rationale": "string",
+      "decision_status": "open | validated | rejected"
+    },
+    "Contract": {
+      "preconditions": [
+        "string"
+      ],
+      "postconditions": [
+        "string"
+      ],
+      "invariants": [
+        "string"
+      ],
+      "acceptance": [
+        {
+          "given": "string",
+          "when": "string",
+          "then": "string"
+        }
+      ],
+      "origin_mode": "greenfield | legacy-bootstrap"
+    },
+    "Example": {
+      "input": "json",
+      "expected_output": "json",
+      "edge_case": "boolean",
+      "behavioral_signature": {
+        "input_types": [
+          "string"
+        ],
+        "output_types": [
+          "string"
+        ],
+        "tags": [
+          "nominal | boundary | empty-case | error-path | state-transition | ..."
+        ]
+      },
+      "origin": "formalizer | inferred-from-existing-test | human"
+    },
+    "Task": {
+      "title": "string",
+      "phase": "string",
+      "workflow_status": "todo | in_progress | blocked | done | stale",
+      "definition_of_done": "object/string",
+      "scope": {
+        "target_contracts": [
+          "contract-id"
+        ],
+        "target_codeunits": [
+          "codeunit-id"
+        ],
+        "target_configunits": [
+          "configunit-id"
+        ],
+        "allowed_paths": [
+          "glob"
+        ]
+      },
+      "decisions": [
+        {
+          "choice": "string",
+          "rationale": "string",
+          "at": "ISO-8601"
+        }
+      ]
+    },
+    "CodeUnit": {
+      "path": "string",
+      "symbol": "string",
+      "kind": "function | class | method | module | other",
+      "hash": "sha256",
+      "git_commit": "string | null",
+      "language": "string | null"
+    },
+    "ConfigUnit": {
+      "path": "string",
+      "key": "semantic configuration key/section",
+      "kind": "setting | feature_flag | environment | route_config | framework_config | other",
+      "value_hash": "sha256",
+      "scope_hint": "local | subsystem | project-wide | unknown"
+    },
+    "Test": {
+      "path": "string",
+      "symbol": "string | null",
+      "framework": "string | null",
+      "last_result": "red | green | skipped | error | not-run"
+    },
+    "ObservedBehavior": {
+      "given": "json/string",
+      "when": "string",
+      "observed": "json/string",
+      "evidence_type": "test | static-code | runtime | config | documentation",
+      "confidence": "low | medium | high"
+    },
+    "Issue": {
+      "title": "string",
+      "description": "string",
+      "reported_by": "human:<id> | llm:<model> | test | bootstrap",
+      "workflow_status": "open | triaging | ready | in_progress | resolved | closed | rejected",
+      "classification": "unknown | suspected_bug | confirmed_bug | expected_behavior | specification_gap | requirement_ambiguity | regression | tech_debt | duplicate",
+      "severity": "low | medium | high | critical | unknown",
+      "evidence": [
+        "object/string"
+      ],
+      "resolution": "string | null"
+    }
+  },
+  "edges": {
+    "CLARIFIES": {
+      "from": [
+        "Clarification",
+        "Assumption"
+      ],
+      "to": [
+        "Requirement"
+      ]
+    },
+    "FORMALIZES": {
+      "from": [
+        "Contract"
+      ],
+      "to": [
+        "Requirement"
+      ],
+      "fields": {
+        "knowledge_status": "generated | inferred | validated | disputed | stale",
+        "assumptions": [
+          "assumption-id"
+        ],
+        "generated_by": "llm:<model-id> | human",
+        "reviewed_by": "human:<id> | null"
+      }
+    },
+    "WITNESSES": {
+      "from": [
+        "Example"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "DERIVES_FROM": {
+      "from": [
+        "Task"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "GENERATED_BY": {
+      "from": [
+        "CodeUnit",
+        "ConfigUnit",
+        "Test"
+      ],
+      "to": [
+        "Task"
+      ]
+    },
+    "GENERATED_FROM": {
+      "from": [
+        "Test"
+      ],
+      "to": [
+        "Example"
+      ]
+    },
+    "IMPLEMENTS": {
+      "from": [
+        "CodeUnit"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "CONSTRAINS": {
+      "from": [
+        "ConfigUnit"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "TESTS": {
+      "from": [
+        "Test"
+      ],
+      "to": [
+        "Contract",
+        "CodeUnit",
+        "ConfigUnit"
+      ]
+    },
+    "DEPENDS_ON": {
+      "from": [
+        "Task",
+        "CodeUnit",
+        "ConfigUnit"
+      ],
+      "to": [
+        "Task",
+        "CodeUnit",
+        "ConfigUnit"
+      ],
+      "fields": {
+        "kind": "call | import | data | config | runtime | order | inferred"
+      }
+    },
+    "CONTRADICTS": {
+      "from": [
+        "Requirement",
+        "Contract"
+      ],
+      "to": [
+        "Requirement",
+        "Contract"
+      ],
+      "fields": {
+        "status": "open | resolved",
+        "resolution": "string | null"
+      }
+    },
+    "REFINES": {
+      "from": [
+        "Contract"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "SUPERSEDES": {
+      "from": [
+        "Requirement",
+        "Contract",
+        "CodeUnit",
+        "ConfigUnit"
+      ],
+      "to": [
+        "Requirement",
+        "Contract",
+        "CodeUnit",
+        "ConfigUnit"
+      ]
+    },
+    "EVIDENCES": {
+      "from": [
+        "Test",
+        "CodeUnit",
+        "ConfigUnit"
+      ],
+      "to": [
+        "ObservedBehavior"
+      ]
+    },
+    "SUPPORTS": {
+      "from": [
+        "ObservedBehavior"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "INFERRED_FROM": {
+      "from": [
+        "Requirement",
+        "Contract",
+        "Example"
+      ],
+      "to": [
+        "ObservedBehavior",
+        "Test",
+        "CodeUnit",
+        "ConfigUnit"
+      ]
+    },
+    "FOUND_DURING": {
+      "from": [
+        "Issue"
+      ],
+      "to": [
+        "Task"
+      ]
+    },
+    "AFFECTS": {
+      "from": [
+        "Issue"
+      ],
+      "to": [
+        "CodeUnit",
+        "ConfigUnit"
+      ]
+    },
+    "VIOLATES": {
+      "from": [
+        "Issue"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "EXPLAINED_BY": {
+      "from": [
+        "Issue"
+      ],
+      "to": [
+        "Contract"
+      ]
+    },
+    "BLOCKS": {
+      "from": [
+        "Issue"
+      ],
+      "to": [
+        "Task"
+      ]
+    },
+    "ADDRESSES": {
+      "from": [
+        "Task"
+      ],
+      "to": [
+        "Issue"
+      ]
+    }
+  },
+  "propagation": {
+    "semantic_change": {
+      "trigger": "SUPERSEDES Requirement or validated Contract replacement",
+      "effect": "derived branch knowledge_status=stale",
+      "rule": "Requirement -> Contract -> {Example, Task} -> {CodeUnit, ConfigUnit, Test}"
+    },
+    "technical_change": {
+      "trigger": "CodeUnit/ConfigUnit hash changed",
+      "effect": "technical candidates verification_status=needs_revalidation; Requirement/Contract remain semantically valid until evidence says otherwise",
+      "steps": [
+        "identify changed symbol/config key",
+        "typed traversal to directly related contracts/tests/dependencies",
+        "impact-analyst classification",
+        "rerun relevant tests",
+        "review fidelity",
+        "set verified or failed",
+        "open Issue if required"
+      ]
+    }
+  },
+  "consistency_queries": [
+    "validated Requirement without validated Contract",
+    "validated Contract without minimum behavioral coverage",
+    "generated Test without GENERATED_FROM when produced from an Example",
+    "lifecycle-generated CodeUnit/ConfigUnit/Test without GENERATED_BY Task",
+    "validated CodeUnit without IMPLEMENTS Contract unless legacy bootstrap unresolved",
+    "confirmed_bug Issue closed without resolution decision/provenance",
+    "Task changed artifact outside declared scope without Issue/decision",
+    "unresolved needs_revalidation at phase close",
+    "open CONTRADICTS edge",
+    "legacy inferred Requirement/Contract validated without human review provenance"
+  ]
+}
