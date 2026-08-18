@@ -36,6 +36,20 @@ def to_neo4j_properties(model: BaseNode) -> dict[str, Any]:
     return props
 
 
+def _to_native(value: Any) -> Any:
+    """The driver returns its own `neo4j.time.DateTime`/`Date`/`Time`/
+    `Duration` wrapper types for temporal properties (`created_at`,
+    `updated_at`, ...) — not stdlib `datetime`/`date`/`time`/`timedelta`.
+    Pydantic's `datetime` validator doesn't accept them (no test ever caught
+    this: every integration test wipes the graph before running, so nothing
+    ever read back a node that already existed — the only path that
+    round-trips a real stored value through here). `.to_native()` is the
+    driver's own conversion, present on every temporal wrapper type.
+    """
+    to_native = getattr(value, "to_native", None)
+    return to_native() if callable(to_native) else value
+
+
 def from_neo4j_properties(props: dict[str, Any], model_cls: type[T]) -> T:
     json_fields = model_cls.JSON_FIELDS
     data: dict[str, Any] = {}
@@ -46,7 +60,7 @@ def from_neo4j_properties(props: dict[str, Any], model_cls: type[T]) -> T:
                 continue
             except json.JSONDecodeError:
                 pass
-        data[key] = value
+        data[key] = _to_native(value)
     return model_cls.model_validate(data)
 
 

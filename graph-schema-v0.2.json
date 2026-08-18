@@ -57,6 +57,7 @@
       "decision_status": "open | validated | rejected"
     },
     "Contract": {
+      "summary": "string — short human-readable one-liner, for display/graph-caption use only, never a substitute for acceptance criteria",
       "preconditions": [
         "string"
       ],
@@ -76,6 +77,7 @@
       "origin_mode": "greenfield | legacy-bootstrap"
     },
     "Example": {
+      "summary": "string — short human-readable one-liner, for display/graph-caption use only, never a substitute for input/expected_output",
       "input": "json",
       "expected_output": "json",
       "edge_case": "boolean",

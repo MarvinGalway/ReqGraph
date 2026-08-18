@@ -74,6 +74,24 @@ def _text(node: Node | None) -> str:
     return node.text.decode("utf-8")
 
 
+def _declaration_of(node: Node) -> Node:
+    """Unwraps `export`/`export default` — tree-sitter puts a `function_declaration`/
+    `lexical_declaration`/`class_declaration` written as `export function foo() {}`
+    (or `export default ...`) inside an `export_statement` node rather than as a
+    direct child of the file, on a `declaration` field. Without unwrapping this,
+    every exported top-level symbol — i.e. in idiomatic JS/TS, almost everything
+    meant to be used from outside the file — is invisible to the two loops below;
+    only private, non-exported helpers get through. `declaration` is absent only
+    for an anonymous `export default <expression>`, which has no name to extract
+    anyway and falls through to the caller's existing unhandled-node-type case.
+    """
+    if node.type == "export_statement":
+        declaration = node.child_by_field_name("declaration")
+        if declaration is not None:
+            return declaration
+    return node
+
+
 _TEST_CALL_NAMES = {"it", "test"}
 
 
@@ -117,7 +135,8 @@ class JavaScriptExtractor:
         methods_by_class: dict[str, dict[str, str]] = {}
         callable_bodies: list[tuple[Node, str, str | None]] = []
 
-        for node in tree.root_node.children:
+        for raw_node in tree.root_node.children:
+            node = _declaration_of(raw_node)
             if node.type == "function_declaration":
                 name = _text(node.child_by_field_name("name"))
                 if not name:
@@ -266,3 +285,113 @@ class JavaScriptExtractor:
             if obj is not None and obj.type == "this" and prop is not None:
                 return methods_by_class.get(enclosing_class, {}).get(_text(prop))
         return None
+
+
+def _language_for(path: str) -> Language:
+    if path.endswith(".tsx"):
+        return Language(_tsts.language_tsx())
+    if path.endswith(".ts"):
+        return Language(_tsts.language_typescript())
+    return Language(_tsjs.language())
+
+
+def _parse_root(path: str, source: str) -> Node | None:
+    parser = Parser(_language_for(path))
+    try:
+        tree = parser.parse(source.encode("utf-8"))
+    except (ValueError, RecursionError):
+        return None
+    return tree.root_node
+
+
+def _find_node_by_symbol(root: Node, module: str, symbol: str) -> Node | None:
+    """Same top-level-function/class/method naming scheme as
+    `JavaScriptExtractor.extract` — mirrors `python_ast._find_node_by_symbol`.
+    Returns the same node whose text `extract()` hashes for that symbol
+    (the `variable_declarator` for arrow functions, not its `arrow_function`
+    value), so callers get source text consistent with the CodeUnit hash.
+    """
+    for raw_node in root.children:
+        node = _declaration_of(raw_node)
+        if node.type == "function_declaration":
+            name = _text(node.child_by_field_name("name"))
+            if name and f"{module}.{name}" == symbol:
+                return node
+        elif node.type == "lexical_declaration":
+            for decl in node.children:
+                if decl.type != "variable_declarator":
+                    continue
+                value_node = decl.child_by_field_name("value")
+                if value_node is None or value_node.type != "arrow_function":
+                    continue
+                name = _text(decl.child_by_field_name("name"))
+                if name and f"{module}.{name}" == symbol:
+                    return decl
+        elif node.type == "class_declaration":
+            name = _text(node.child_by_field_name("name"))
+            if not name:
+                continue
+            class_symbol = f"{module}.{name}"
+            if class_symbol == symbol:
+                return node
+            body = node.child_by_field_name("body")
+            for member in body.children if body else []:
+                if member.type != "method_definition":
+                    continue
+                method_name = _text(member.child_by_field_name("name"))
+                if method_name and f"{class_symbol}.{method_name}" == symbol:
+                    return member
+    return None
+
+
+def _leading_comment(node: Node) -> Node | None:
+    # A JSDoc block precedes the *statement* — for `const foo = () => {}` that
+    # means the enclosing lexical_declaration, not the variable_declarator
+    # `_find_node_by_symbol` returns for arrow functions. And for anything
+    # exported (`export function foo() {}`), the JSDoc precedes the enclosing
+    # export_statement, not the declaration `_find_node_by_symbol` returns
+    # after `_declaration_of` unwraps it — same reason, one more level up.
+    target = node.parent if node.type == "variable_declarator" else node
+    if target is not None and target.parent is not None and target.parent.type == "export_statement":
+        target = target.parent
+    return target.prev_sibling if target is not None else None
+
+
+def _clean_jsdoc(text: str) -> str:
+    body = text.removeprefix("/**").removesuffix("*/")
+    lines = [line.strip().lstrip("*").strip() for line in body.splitlines()]
+    return "\n".join(line for line in lines if line).strip()
+
+
+def extract_symbol_source(path: str, source: str, symbol: str) -> str | None:
+    """Live source text for one target symbol, or None if not found/unavailable.
+    JS/TS counterpart to `python_ast.extract_symbol_source` — used by
+    `bootstrap-observe --legacy` to seed `static-code` evidence when there's
+    no test or JSDoc for a CodeUnit.
+    """
+    if not TREE_SITTER_AVAILABLE:
+        return None
+    root = _parse_root(path, source)
+    if root is None:
+        return None
+    node = _find_node_by_symbol(root, path_to_module_name(path), symbol)
+    return _text(node) if node is not None else None
+
+
+def extract_symbol_docstring(path: str, source: str, symbol: str) -> str | None:
+    """JSDoc (`/** ... */`) immediately preceding one target symbol, or None.
+    JS/TS counterpart to `python_ast.extract_symbol_docstring` — used by
+    `bootstrap-observe` to produce `documentation`-evidence ObservedBehavior.
+    """
+    if not TREE_SITTER_AVAILABLE:
+        return None
+    root = _parse_root(path, source)
+    if root is None:
+        return None
+    node = _find_node_by_symbol(root, path_to_module_name(path), symbol)
+    if node is None:
+        return None
+    comment = _leading_comment(node)
+    if comment is None or comment.type != "comment" or not _text(comment).startswith("/**"):
+        return None
+    return _clean_jsdoc(_text(comment)) or None

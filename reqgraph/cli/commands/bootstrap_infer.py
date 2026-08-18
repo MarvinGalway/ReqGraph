@@ -9,7 +9,7 @@ prompt (reverse_analyst hard_rule).
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Callable
 
 import typer
 from neo4j import Session
@@ -83,6 +83,7 @@ def _infer_one_group(
     requirements.create(sess, requirement)
 
     contract = Contract(
+        summary=output.contract.summary,
         preconditions=output.contract.preconditions,
         postconditions=output.contract.postconditions,
         invariants=output.contract.invariants,
@@ -97,6 +98,7 @@ def _infer_one_group(
     example_ids = []
     for e in output.examples:
         example = Example(
+            summary=e.summary,
             input=e.input,
             expected_output=e.expected_output,
             edge_case=e.edge_case,
@@ -126,8 +128,18 @@ def run(
         int, typer.Option(help="Max evidence groups to process this run (one LLM call per group)")
     ] = 10,
 ) -> None:
+    run_impl(observed_id=observed_id, max_groups=max_groups)
+
+
+def run_impl(
+    observed_id: list[str] | None = None,
+    max_groups: int = 10,
+    on_progress: Callable[[str], None] | None = None,
+) -> None:
+    """See bootstrap_scan.run_impl's docstring for why this split exists."""
     observed_id = observed_id or []
     root = project_root()
+    progress = on_progress or (lambda _msg: None)
     results: list[tuple[Requirement, Contract, list[str], ReverseAnalystOutput]] = []
 
     with graph_session() as sess:
@@ -135,18 +147,23 @@ def run(
             behaviors = [b for b in (observed_behaviors.get(sess, oid) for oid in observed_id) if b]
             if not behaviors:
                 console.print("[yellow]None of the given --observed-id were found.[/yellow]")
+                progress("No ObservedBehavior found for the given --observed-id.")
                 raise typer.Exit(code=0)
+            progress(f"Inferring from {len(behaviors)} explicitly given ObservedBehavior (1 LLM call)...")
             results.append(_infer_one_group(sess, behaviors))
         else:
             groups_by_path = _ungrouped_behaviors_by_path(sess)
             if not groups_by_path:
                 console.print("[yellow]No ObservedBehavior available to infer from.[/yellow]")
+                progress("No ObservedBehavior available to infer from — run bootstrap-observe first.")
                 raise typer.Exit(code=0)
-            for path in sorted(groups_by_path)[:max_groups]:
+            paths = sorted(groups_by_path)[:max_groups]
+            for i, path in enumerate(paths, start=1):
                 behaviors = [b for b in (observed_behaviors.get(sess, oid) for oid in groups_by_path[path]) if b]
                 if not behaviors:
                     continue
                 console.print(f"[dim]Grouping {len(behaviors)} ObservedBehavior from {path!r}...[/dim]")
+                progress(f"[{i}/{len(paths)}] Inferring Requirement/Contract from {len(behaviors)} evidence in {path!r} (LLM call)...")
                 results.append(_infer_one_group(sess, behaviors))
 
     bootstrap_path = bootstrap_state_path(root)
@@ -170,4 +187,5 @@ def run(
     for requirement, contract, example_ids, output in results:
         table.add_row(requirement.id, contract.id, str(len(example_ids)), output.rationale)
     console.print(table)
-    console.print("Next: `graph-cli bootstrap-review --next` to walk the review queue.")
+    console.print("Next: `graph-cli bootstrap-review` to walk the review queue.")
+    progress(f"bootstrap-infer complete: {len(results)} candidate Requirement/Contract group(s) inferred.")

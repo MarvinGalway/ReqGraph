@@ -91,6 +91,7 @@ class AcceptanceCriterion(BaseModel):
 class Contract(BaseNode):
     JSON_FIELDS: ClassVar[frozenset[str]] = frozenset({"acceptance"})
 
+    summary: str = ""
     preconditions: list[str] = Field(default_factory=list)
     postconditions: list[str] = Field(default_factory=list)
     invariants: list[str] = Field(default_factory=list)
@@ -109,6 +110,7 @@ class Example(BaseNode):
         {"input", "expected_output", "behavioral_signature"}
     )
 
+    summary: str = ""
     input: dict | list | str | int | float | bool | None = None
     expected_output: dict | list | str | int | float | bool | None = None
     edge_case: bool = False

@@ -87,18 +87,83 @@ def test_bootstrap_observe_creates_documentation_evidence(neo4j_session, project
     assert "already shipped" in behavior.observed
 
 
+def test_bootstrap_observe_leaves_undocumented_untested_symbols_uncovered_without_legacy(
+    neo4j_session, project_root, target_repo_js
+):
+    pytest.importorskip("tree_sitter_javascript")
+    _git_init_and_commit(target_repo_js)
+    runner.invoke(app, ["bootstrap-scan", str(target_repo_js)])
+
+    result = runner.invoke(app, ["bootstrap-observe", "--repo-path", str(target_repo_js)])
+    assert result.exit_code == 0, result.output
+
+    # refundOrder/markRefunded have no test coverage and no JSDoc in the fixture —
+    # without --legacy they get no ObservedBehavior at all.
+    repo = CodeUnitRepository()
+    refund_order = repo.find_current(neo4j_session, "orders.js", "orders.refundOrder")
+    assert outgoing_ids(neo4j_session, refund_order.id, "EVIDENCES") == []
+
+
+def test_bootstrap_observe_legacy_covers_undocumented_untested_symbols(neo4j_session, project_root, target_repo_js):
+    pytest.importorskip("tree_sitter_javascript")
+    _git_init_and_commit(target_repo_js)
+    runner.invoke(app, ["bootstrap-scan", str(target_repo_js)])
+
+    result = runner.invoke(app, ["bootstrap-observe", "--repo-path", str(target_repo_js), "--legacy"])
+    assert result.exit_code == 0, result.output
+
+    repo = CodeUnitRepository()
+    refund_order = repo.find_current(neo4j_session, "orders.js", "orders.refundOrder")
+    behavior_ids = outgoing_ids(neo4j_session, refund_order.id, "EVIDENCES")
+    assert behavior_ids
+
+    behavior = ObservedBehaviorRepository().get(neo4j_session, behavior_ids[0])
+    assert behavior.evidence_type == "static-code"
+    assert behavior.confidence == "low"
+    assert "markRefunded" in behavior.observed
+
+
+def test_bootstrap_observe_legacy_does_not_duplicate_existing_documentation_evidence(
+    neo4j_session, project_root, target_repo
+):
+    # cancel_order already gets `documentation` evidence from its docstring (pass 2) —
+    # --legacy must skip CodeUnits already evidenced, not add a redundant static-code entry.
+    _git_init_and_commit(target_repo)
+    runner.invoke(app, ["bootstrap-scan", str(target_repo)])
+
+    result = runner.invoke(app, ["bootstrap-observe", "--repo-path", str(target_repo), "--legacy"])
+    assert result.exit_code == 0, result.output
+
+    repo = CodeUnitRepository()
+    cancel_order = repo.find_current(neo4j_session, "orders.py", "orders.cancel_order")
+    behaviors = [
+        ObservedBehaviorRepository().get(neo4j_session, bid)
+        for bid in outgoing_ids(neo4j_session, cancel_order.id, "EVIDENCES")
+    ]
+    assert [b.evidence_type for b in behaviors] == ["documentation"]
+
+    # calculate_total has neither test nor docstring — --legacy covers it.
+    calculate_total = repo.find_current(neo4j_session, "orders.py", "orders.calculate_total")
+    calc_behaviors = [
+        ObservedBehaviorRepository().get(neo4j_session, bid)
+        for bid in outgoing_ids(neo4j_session, calculate_total.id, "EVIDENCES")
+    ]
+    assert [b.evidence_type for b in calc_behaviors] == ["static-code"]
+
+
 def _reverse_analyst_output(subject: str) -> ReverseAnalystOutput:
     return ReverseAnalystOutput(
         requirement=CandidateRequirementDraft(text=f"candidate requirement for {subject}"),
         contract=ContractDraft(
+            summary=f"contract for {subject}",
             preconditions=["p"],
             postconditions=["q"],
             acceptance=[AcceptanceCriterionDraft(given="g", when="w", then="t")],
         ),
         examples=[
-            ExampleDraft(input={"a": 1}, expected_output={"b": 2}, edge_case=False, behavioral_signature=BehavioralSignatureDraft()),
-            ExampleDraft(input={"a": 0}, expected_output={"b": 0}, edge_case=True, behavioral_signature=BehavioralSignatureDraft()),
-            ExampleDraft(input={"a": -1}, expected_output={"b": -2}, edge_case=True, behavioral_signature=BehavioralSignatureDraft()),
+            ExampleDraft(summary="nominal", input={"a": 1}, expected_output={"b": 2}, edge_case=False, behavioral_signature=BehavioralSignatureDraft()),
+            ExampleDraft(summary="zero edge case", input={"a": 0}, expected_output={"b": 0}, edge_case=True, behavioral_signature=BehavioralSignatureDraft()),
+            ExampleDraft(summary="negative edge case", input={"a": -1}, expected_output={"b": -2}, edge_case=True, behavioral_signature=BehavioralSignatureDraft()),
         ],
         rationale=f"grouped evidence for {subject}",
     )

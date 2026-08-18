@@ -1,0 +1,16 @@
+{
+  "mode": "existing-project",
+  "stage": "scan",
+  "repository_revision": "e30d93be97892a36df2bb4bdc9ce16e813053323",
+  "counts": {
+    "codeunits": 7,
+    "configunits": 0,
+    "tests": 3,
+    "observed_behaviors": 0,
+    "candidate_contracts": 0,
+    "candidate_requirements": 0,
+    "validated_contracts": 0,
+    "validated_requirements": 0
+  },
+  "review_queue": []
+}

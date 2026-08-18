@@ -67,6 +67,31 @@ maintenance_app.command("invalidate")(invalidate.run)
 maintenance_app.command("consistency-check")(consistency_check.run)
 app.command("status")(status.run)
 
+
+@app.command("serve")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Bind host"),
+    port: int = typer.Option(8321, help="Bind port"),
+) -> None:
+    """Run the local HTTP API `viewer/` uses to drive bootstrap-scan/observe/
+    infer with live progress. Requires the `api` extra
+    (`pip install -e ".[dev,api]"`). Serves whichever project this command's
+    cwd/.env point at — see README's "One Neo4j instance per project": run
+    one of these per project, not shared across projects.
+    """
+    from reqgraph.cli.common import console
+
+    try:
+        from reqgraph.api.server import run_server
+    except ImportError as e:
+        console.print(
+            "[red]The `api` extra isn't installed.[/red] Run: "
+            '[bold]pip install -e ".[dev,api]"[/bold]'
+        )
+        raise typer.Exit(code=1) from e
+    run_server(host=host, port=port)
+
+
 app.add_typer(greenfield_app)
 app.add_typer(legacy_app)
 app.add_typer(maintenance_app)

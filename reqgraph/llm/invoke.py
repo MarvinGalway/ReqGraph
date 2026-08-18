@@ -27,7 +27,10 @@ def invoke_role(
     user_prompt: str,
     output_model: type[T],
     *,
-    max_tokens: int = 4096,
+    # Roles with `effort` set enable adaptive thinking, whose tokens share this
+    # same budget with the final structured output — too low a default truncates
+    # the JSON mid-response before thinking leaves it any room to finish.
+    max_tokens: int = 16384,
     validate: Callable[[T], str | None] | None = None,
     max_retries: int = 1,
 ) -> T:

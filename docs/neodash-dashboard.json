@@ -1,0 +1,164 @@
+{
+  "title": "ReqGraph — Traceability & Status",
+  "version": "2.4",
+  "settings": {
+    "pagenumber": 0,
+    "editable": true,
+    "fullscreenEnabled": true,
+    "parameters": {},
+    "queryTimeLimit": 120,
+    "theme": "light"
+  },
+  "pages": [
+    {
+      "title": "Traceability chain",
+      "reports": [
+        {
+          "title": "Requirement -> Contract -> Example/Task/CodeUnit/Test",
+          "query": "MATCH (r:Requirement)<-[:FORMALIZES]-(c:Contract)\nOPTIONAL MATCH (c)<-[:WITNESSES]-(e:Example)\nOPTIONAL MATCH (c)<-[:DERIVES_FROM]-(t:Task)\nOPTIONAL MATCH (c)<-[:IMPLEMENTS]-(cu:CodeUnit)\nOPTIONAL MATCH (c)<-[:CONSTRAINS]-(cf:ConfigUnit)\nOPTIONAL MATCH (c)<-[:TESTS]-(test:Test)\nRETURN r, c, e, t, cu, cf, test\nLIMIT 150",
+          "width": 12,
+          "height": 9,
+          "x": 0,
+          "y": 0,
+          "type": "graph",
+          "selection": {},
+          "settings": {
+            "nodeColorScheme": "knowledge_status",
+            "nodeCaptionScheme": "label"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Status overview",
+      "reports": [
+        {
+          "title": "Validated Requirements",
+          "query": "MATCH (r:Requirement {knowledge_status: 'validated'}) RETURN count(r) AS Validated_Requirements",
+          "width": 3,
+          "height": 3,
+          "x": 0,
+          "y": 0,
+          "type": "value",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Validated Contracts",
+          "query": "MATCH (c:Contract {knowledge_status: 'validated'}) RETURN count(c) AS Validated_Contracts",
+          "width": 3,
+          "height": 3,
+          "x": 3,
+          "y": 0,
+          "type": "value",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Open Issues",
+          "query": "MATCH (i:Issue) WHERE i.workflow_status IN ['open', 'triaging', 'ready', 'in_progress'] RETURN count(i) AS Open_Issues",
+          "width": 3,
+          "height": 3,
+          "x": 6,
+          "y": 0,
+          "type": "value",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Needs Revalidation",
+          "query": "MATCH (n) WHERE n.verification_status = 'needs_revalidation' RETURN count(n) AS Needs_Revalidation",
+          "width": 3,
+          "height": 3,
+          "x": 9,
+          "y": 0,
+          "type": "value",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Knowledge status distribution",
+          "query": "MATCH (n) WHERE n.knowledge_status IS NOT NULL\nRETURN n.knowledge_status AS status, count(*) AS count\nORDER BY count DESC",
+          "width": 6,
+          "height": 5,
+          "x": 0,
+          "y": 3,
+          "type": "bar",
+          "selection": {"index": "status", "value": "count"},
+          "settings": {}
+        },
+        {
+          "title": "Verification status distribution",
+          "query": "MATCH (n) WHERE n.verification_status IS NOT NULL\nRETURN n.verification_status AS status, count(*) AS count\nORDER BY count DESC",
+          "width": 6,
+          "height": 5,
+          "x": 6,
+          "y": 3,
+          "type": "bar",
+          "selection": {"index": "status", "value": "count"},
+          "settings": {}
+        },
+        {
+          "title": "Artifacts needing revalidation",
+          "query": "MATCH (n) WHERE n.verification_status = 'needs_revalidation'\nRETURN labels(n)[0] AS type, n.id AS id,\n       coalesce(n.path, n.summary, n.title, n.text) AS label,\n       n.updated_at AS updated_at\nORDER BY n.updated_at DESC",
+          "width": 12,
+          "height": 5,
+          "x": 0,
+          "y": 8,
+          "type": "table",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Stale artifacts (semantic change pending)",
+          "query": "MATCH (n) WHERE n.knowledge_status = 'stale'\nRETURN labels(n)[0] AS type, n.id AS id,\n       coalesce(n.summary, n.title, n.text) AS label,\n       n.updated_at AS updated_at\nORDER BY n.updated_at DESC",
+          "width": 12,
+          "height": 5,
+          "x": 0,
+          "y": 13,
+          "type": "table",
+          "selection": {},
+          "settings": {}
+        }
+      ]
+    },
+    {
+      "title": "Issues & gates",
+      "reports": [
+        {
+          "title": "Open Issues (by severity)",
+          "query": "MATCH (i:Issue)\nWHERE i.workflow_status IN ['open', 'triaging', 'ready', 'in_progress']\nRETURN i.id AS id, i.title AS title, i.severity AS severity,\n       i.classification AS classification, i.workflow_status AS status\nORDER BY CASE i.severity\n  WHEN 'critical' THEN 0 WHEN 'high' THEN 1\n  WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END",
+          "width": 12,
+          "height": 6,
+          "x": 0,
+          "y": 0,
+          "type": "table",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Blocking Clarifications (unanswered)",
+          "query": "MATCH (cl:Clarification {blocking: true})-[:CLARIFIES]->(r:Requirement)\nWHERE cl.answer IS NULL\nRETURN cl.id AS clarification_id, cl.question AS question,\n       r.id AS requirement_id, r.text AS requirement",
+          "width": 6,
+          "height": 6,
+          "x": 0,
+          "y": 6,
+          "type": "table",
+          "selection": {},
+          "settings": {}
+        },
+        {
+          "title": "Open CONTRADICTS edges",
+          "query": "MATCH (a)-[rel:CONTRADICTS {status: 'open'}]->(b)\nRETURN labels(a)[0] AS from_type, coalesce(a.summary, a.text) AS from_label,\n       labels(b)[0] AS to_type, coalesce(b.summary, b.text) AS to_label",
+          "width": 6,
+          "height": 6,
+          "x": 6,
+          "y": 6,
+          "type": "table",
+          "selection": {},
+          "settings": {}
+        }
+      ]
+    }
+  ]
+}

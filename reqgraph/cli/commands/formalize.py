@@ -55,6 +55,7 @@ def run(
         )
 
         contract = Contract(
+            summary=output.contract.summary,
             preconditions=output.contract.preconditions,
             postconditions=output.contract.postconditions,
             invariants=output.contract.invariants,
@@ -71,6 +72,7 @@ def run(
         example_ids = []
         for e in output.examples:
             example = Example(
+                summary=e.summary,
                 input=e.input,
                 expected_output=e.expected_output,
                 edge_case=e.edge_case,

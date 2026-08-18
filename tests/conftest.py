@@ -30,6 +30,30 @@ def _isolated_settings(monkeypatch, tmp_path):
     llm_client_module.reset_client_cache()
 
 
+# Any test fixture in this suite creates at most a handful of nodes. A count
+# above this is a signal that NEO4J_URI points at something other than a
+# disposable test instance — e.g. a real bootstrapped project's graph, which
+# happened once: a `pytest -m integration` run destroyed a project's 827-node
+# graph because Community Edition's single-database limit meant it shared the
+# same instance as this repo's tests. See `_guard_against_wiping_real_data`.
+_MAX_PLAUSIBLE_TEST_NODES = 50
+
+
+def _guard_against_wiping_real_data(sess) -> None:
+    if os.environ.get("REQGRAPH_ALLOW_TEST_WIPE") == "1":
+        return
+    count = sess.run("MATCH (n) RETURN count(n) AS n").single()["n"]
+    if count > _MAX_PLAUSIBLE_TEST_NODES:
+        uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+        pytest.fail(
+            f"Refusing to wipe Neo4j at {uri}: found {count} nodes, more than any test fixture "
+            f"in this suite would ever create ({_MAX_PLAUSIBLE_TEST_NODES}). This looks like a "
+            "real project's graph, not a disposable test instance — point NEO4J_URI/"
+            "NEO4J_DATABASE at a dedicated test instance instead. If you're certain it's safe "
+            "to wipe, set REQGRAPH_ALLOW_TEST_WIPE=1."
+        )
+
+
 @pytest.fixture
 def neo4j_session():
     """A live Neo4j session, wiped clean before use. Skips the test if Neo4j
@@ -39,6 +63,7 @@ def neo4j_session():
     if not driver_module.verify_connectivity():
         pytest.skip("Neo4j is not reachable (docker compose up -d neo4j)")
     with driver_module.session() as sess:
+        _guard_against_wiping_real_data(sess)
         sess.run("MATCH (n) DETACH DELETE n")
         apply_schema(sess, with_vector=False)
         yield sess

@@ -14,5 +14,20 @@ services:
       timeout: 5s
       retries: 20
 
+  neodash:
+    image: nielsdejong/neodash:latest
+    environment:
+      # Pre-fills the NeoDash connect modal; the password is still typed by hand.
+      # Leave standalone mode off so the graph/status dashboard stays editable in the UI.
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USER: neo4j
+      NEO4J_DATABASE: neo4j
+      SSO_ENABLED: "false"
+    ports:
+      - "5005:5005"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
 volumes:
   neo4j_data:

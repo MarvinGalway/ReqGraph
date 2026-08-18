@@ -1,0 +1,57 @@
+# Per-project Neo4j instance for ReqGraph.
+#
+# One of these per bootstrapped/greenfield project — never point a project at
+# ReqGraph's own dev/test instance (this repo's docker-compose.yml), and
+# never share one instance across two projects. Neo4j Community Edition only
+# supports a single database per instance, so "isolation" here means a
+# separate container, not a separate database inside a shared one. This is a
+# hard lesson, not a style preference: a shared instance previously let a
+# `pytest -m integration` run in this repo wipe a real project's 827-node
+# graph via a blanket `DETACH DELETE n`.
+#
+# Setup (from the target project's own repo root):
+#   cp <reqgraph>/docs/templates/docker-compose.neo4j.yml docker-compose.neo4j.yml
+#   cp <reqgraph>/docs/templates/.env.neo4j.example .env.neo4j
+#   # only edit .env.neo4j if these default ports collide with something
+#   # already running (e.g. you're also running ReqGraph's own instance, or
+#   # more than one project's instance, at the same time)
+#   docker compose -f docker-compose.neo4j.yml --env-file .env.neo4j up -d
+#
+# Then point this project's own .env at it:
+#   NEO4J_URI=bolt://localhost:<NEO4J_BOLT_PORT from .env.neo4j>
+#   NEO4J_PASSWORD=<NEO4J_PASSWORD from .env.neo4j>
+# and, if you're using ReqGraph's viewer/ against this project, its
+# viewer/.env.local VITE_NEO4J_URI/VITE_NEO4J_PASSWORD the same way.
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-reqgraph-dev}
+    ports:
+      - "${NEO4J_HTTP_PORT:-7475}:7474" # browser, dev convenience
+      - "${NEO4J_BOLT_PORT:-7688}:7687" # bolt — this is what graph-cli talks to
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-O", "/dev/null", "http://localhost:7474"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  neodash:
+    image: nielsdejong/neodash:latest
+    environment:
+      # Pre-fills the NeoDash connect modal; the password is still typed by hand.
+      NEO4J_URI: bolt://localhost:${NEO4J_BOLT_PORT:-7688}
+      NEO4J_USER: neo4j
+      NEO4J_DATABASE: neo4j
+      SSO_ENABLED: "false"
+    ports:
+      - "${NEODASH_PORT:-5006}:5005"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+volumes:
+  neo4j_data:

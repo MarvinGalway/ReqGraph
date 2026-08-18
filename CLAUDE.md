@@ -52,7 +52,7 @@ These four files describe one model from different angles and must stay consiste
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **ReqGraph** (1598 symbols, 2662 relationships, 68 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **ReqGraph** (2049 symbols, 3474 relationships, 74 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

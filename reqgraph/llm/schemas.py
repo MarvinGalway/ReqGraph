@@ -52,6 +52,11 @@ class AcceptanceCriterionDraft(BaseModel):
 
 
 class ContractDraft(BaseModel):
+    summary: str = Field(
+        description="One short sentence (<=80 chars) naming the behavior this contract "
+        "covers, e.g. 'shuffle quiz options without mutating input'. Used as a graph-"
+        "visualization caption, not a substitute for the acceptance criteria below."
+    )
     preconditions: list[str] = Field(default_factory=list)
     postconditions: list[str] = Field(default_factory=list)
     invariants: list[str] = Field(default_factory=list)
@@ -65,6 +70,11 @@ class BehavioralSignatureDraft(BaseModel):
 
 
 class ExampleDraft(BaseModel):
+    summary: str = Field(
+        description="One short sentence (<=80 chars) naming this scenario, e.g. "
+        "'empty array in -> empty array out'. Used as a graph-visualization caption, "
+        "not a substitute for input/expected_output below."
+    )
     input: dict = Field(default_factory=dict)
     expected_output: dict = Field(default_factory=dict)
     edge_case: bool = False

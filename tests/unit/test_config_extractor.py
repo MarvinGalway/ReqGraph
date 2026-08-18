@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from reqgraph.extract.config_extractor import extract_config_units
+from reqgraph.extract.config_extractor import extract_config_units, is_config_path
 
 
 def test_env_file_extraction():
@@ -30,3 +30,21 @@ def test_config_diff_is_key_level_not_file_level():
     units_b = {u.key: u.value_hash for u in extract_config_units("settings.py", source_b)}
     assert units_a["DEBUG"] == units_b["DEBUG"]
     assert units_a["FEATURE_X_ENABLED"] != units_b["FEATURE_X_ENABLED"]
+
+
+def test_lockfiles_excluded_by_default():
+    assert is_config_path("package-lock.json") is False
+    assert is_config_path("pnpm-lock.yaml") is False
+    assert is_config_path("nested/dir/package-lock.json") is False
+
+
+def test_lockfiles_included_when_opted_in():
+    assert is_config_path("package-lock.json", include_lockfiles=True) is True
+    assert is_config_path("pnpm-lock.yaml", include_lockfiles=True) is True
+
+
+def test_manifest_and_project_config_always_included():
+    assert is_config_path("package.json") is True
+    assert is_config_path("public/manifest.json") is True
+    assert is_config_path("tsconfig.json") is True
+    assert is_config_path(".oxlintrc.json") is True

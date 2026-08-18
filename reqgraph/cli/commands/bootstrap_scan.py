@@ -10,6 +10,9 @@ commit-history provenance on each module CodeUnit's `source_refs`.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated, Callable
+
+import typer
 
 from reqgraph.cli.common import console, graph_session, project_root
 from reqgraph.extract.base import ExtractedCall, Extractor
@@ -31,14 +34,40 @@ from reqgraph.state.paths import bootstrap_state_path
 from reqgraph.state.schemas import BootstrapState
 
 
-def run(repo_path: Path) -> None:
+def run(
+    repo_path: Path,
+    include_lockfiles: Annotated[
+        bool,
+        typer.Option(
+            help="Also extract ConfigUnit from dependency lockfiles (package-lock.json, "
+            "yarn.lock, ...). Off by default: a lockfile isn't project configuration and "
+            "produces hundreds of noise ConfigUnit per file."
+        ),
+    ] = False,
+) -> None:
+    run_impl(repo_path, include_lockfiles=include_lockfiles)
+
+
+def run_impl(
+    repo_path: Path,
+    include_lockfiles: bool = False,
+    on_progress: Callable[[str], None] | None = None,
+) -> None:
+    """The actual scan, minus Typer's CLI-parameter wrapping — `run()` above
+    is what `graph-cli bootstrap-scan` registers (Typer/Click can't build a
+    CLI option for a `Callable` parameter, so `on_progress` can't live on a
+    function registered directly as a command). Callers that want live
+    progress (the API server) call this directly instead of `run()`.
+    """
     root = project_root()
+    progress = on_progress or (lambda _msg: None)
 
     all_files = _list_all_tracked(repo_path)
     code_files: dict[str, Extractor] = {
         p: extractor for p in all_files if (extractor := get_extractor_for(p)) is not None
     }
     module_by_file: dict[str, str] = {p: path_to_module_name(p) for p in code_files}
+    progress(f"Found {len(all_files)} tracked file(s), {len(code_files)} recognized as code.")
 
     codeunit_count = 0
     test_count = 0
@@ -53,6 +82,7 @@ def run(repo_path: Path) -> None:
         file_calls: dict[str, list[ExtractedCall]] = {}
 
         for path, extractor in code_files.items():
+            progress(f"Scanning {path}")
             source = (repo_path / path).read_text(encoding="utf-8")
             module_name = module_by_file[path]
             file_hash = sha256_text(source)
@@ -139,8 +169,9 @@ def run(repo_path: Path) -> None:
                 call_edge_count += 1
 
         for path in all_files:
-            if path in code_files or not is_config_path(path):
+            if path in code_files or not is_config_path(path, include_lockfiles=include_lockfiles):
                 continue
+            progress(f"Extracting config from {path}")
             source = (repo_path / path).read_text(encoding="utf-8")
             for cfg in extract_config_units(path, source):
                 existing_cfg = configunits.find_current(sess, cfg.path, cfg.key)
@@ -173,11 +204,12 @@ def run(repo_path: Path) -> None:
     state.counts.tests += test_count
     state_io.write_json(bootstrap_path, state.model_dump(mode="json"))
 
-    console.print(
-        f"[green]bootstrap-scan complete:[/green] {codeunit_count} CodeUnit, "
-        f"{test_count} Test, {configunit_count} ConfigUnit written/updated, "
-        f"{call_edge_count} call-graph edge(s)."
+    summary = (
+        f"bootstrap-scan complete: {codeunit_count} CodeUnit, {test_count} Test, "
+        f"{configunit_count} ConfigUnit written/updated, {call_edge_count} call-graph edge(s)."
     )
+    console.print(f"[green]{summary}[/green]")
+    progress(summary)
 
 
 _EXCLUDED_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", "dist", "build"}

@@ -18,6 +18,28 @@ from reqgraph.extract.hashing import sha256_value
 
 FEATURE_FLAG_MARKERS = ("_ENABLED", "_FLAG", "_ON", "_OFF")
 
+# Dependency lockfiles: valid JSON/YAML/TOML, so they'd otherwise pass the
+# extension check below and get flattened key-by-key (a single npm
+# package-lock.json can produce hundreds of ConfigUnit, none of which are
+# project configuration a Contract would ever CONSTRAIN). Excluded by
+# default; `bootstrap-scan --include-lockfiles` opts back in.
+LOCKFILE_NAMES = frozenset(
+    {
+        "package-lock.json",
+        "npm-shrinkwrap.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "composer.lock",
+        "Gemfile.lock",
+        "Cargo.lock",
+        "poetry.lock",
+        "Pipfile.lock",
+        "go.sum",
+        "mix.lock",
+        "flake.lock",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ExtractedConfigUnit:
@@ -138,8 +160,10 @@ def _extract_python_settings(path: str, source: str) -> list[ExtractedConfigUnit
     return units
 
 
-def is_config_path(path: str) -> bool:
+def is_config_path(path: str, include_lockfiles: bool = False) -> bool:
     name = Path(path).name
+    if not include_lockfiles and name in LOCKFILE_NAMES:
+        return False
     return (
         name == ".env"
         or name.startswith(".env.")
