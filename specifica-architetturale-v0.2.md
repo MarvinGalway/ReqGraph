@@ -554,6 +554,8 @@ La project state è memoria operativa per gli agenti; Neo4j resta la fonte delle
 
 I ruoli possono condividere lo stesso modello fisico, ma `Reviewer` deve essere diverso dal `Codegen`.
 
+Il binding modello è per-ruolo e multi-provider: ogni ruolo dichiara indipendentemente `provider` + `model` (vedi `models-config-v0.2.json`, sezione `providers`). I provider supportati out-of-the-box sono `anthropic` e `openai`; l'elenco è estendibile senza cambi di schema, aggiungendo l'id provider all'allowlist e il relativo adapter nel layer `graph-cli`/OpenCode. Il vincolo `Reviewer ≠ Codegen` si valuta sulla coppia fisica `(provider, model)`, non sulla sola stringa id — quindi è ammesso, ad esempio, avere `codegen` su `openai` e `reviewer` su `anthropic` (o viceversa), oltre a due modelli diversi sullo stesso provider.
+
 ---
 
 ## 13. `graph-cli` previsto

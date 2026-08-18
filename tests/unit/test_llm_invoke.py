@@ -53,3 +53,35 @@ def test_invoke_role_raises_when_response_unparseable(fake_anthropic):
     fake_anthropic(responses=[None, None])
     with pytest.raises(RoleInvocationError):
         invoke_role(ROLES["critic"], "system", "user", DummyOutput, max_retries=1)
+
+
+def test_invoke_role_uses_openai_responses_api_when_role_provider_is_openai(
+    monkeypatch, fake_openai
+):
+    monkeypatch.setenv("REQGRAPH_PROVIDER_CRITIC", "openai")
+    fake = fake_openai(responses=[DummyOutput(value=7)])
+    result = invoke_role(ROLES["critic"], "system", "user", DummyOutput)
+    assert result.value == 7
+    call = fake.responses.calls[0]
+    assert call["text_format"] is DummyOutput
+    assert call["instructions"] == "system"
+    assert call["input"] == "user"
+    assert call["reasoning"] == {"effort": "high"}
+    assert call["model"] == "gpt-5.1"
+
+
+def test_invoke_role_global_provider_override_applies_to_all_roles(monkeypatch, fake_openai):
+    monkeypatch.setenv("REQGRAPH_PROVIDER", "openai")
+    fake = fake_openai(responses=[DummyOutput(value=1)])
+    invoke_role(ROLES["librarian"], "system", "user", DummyOutput)
+    assert fake.responses.calls[0]["model"] == "gpt-5.1-mini"
+
+
+def test_invoke_role_per_role_model_override_wins_over_provider_default(
+    monkeypatch, fake_openai
+):
+    monkeypatch.setenv("REQGRAPH_PROVIDER_CRITIC", "openai")
+    monkeypatch.setenv("REQGRAPH_MODEL_CRITIC", "gpt-5.1-custom")
+    fake = fake_openai(responses=[DummyOutput(value=1)])
+    invoke_role(ROLES["critic"], "system", "user", DummyOutput)
+    assert fake.responses.calls[0]["model"] == "gpt-5.1-custom"

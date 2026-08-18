@@ -1,11 +1,18 @@
 {
-  "$schema_note": "ReqGraph v0.2 role/model configuration. Model ids remain deployment placeholders.",
+  "$schema_note": "ReqGraph v0.2 role/model configuration. Model ids remain deployment placeholders, each bindable to any provider listed in `providers.supported`.",
   "version": "0.2",
+  "providers": {
+    "supported": ["anthropic", "openai"],
+    "extensible": true,
+    "note": "Each role binds independently to a `provider` + `model` id at deployment time. Roles may mix providers freely (e.g. codegen on one provider, reviewer on another). `providers.supported` is an allowlist for the `provider` field below; adding another OpenAI-compatible or third-party provider only requires appending its id here plus wiring it into the graph-cli/OpenCode model adapter layer (spec §12/§13) — no schema change needed.",
+    "reviewer_constraint_note": "roles.reviewer.constraint ('must differ from codegen') is evaluated on the physical (provider, model) pair, not on the id string alone — e.g. codegen=openai/<coding-model-id> and reviewer=anthropic/<different-from-codegen> satisfies it, but so would two different model ids on the same provider."
+  },
   "roles": {
     "critic": {
       "pipeline": "greenfield",
       "purpose": "attack requirements: ambiguity, gaps, contradictions, edge cases",
       "profile": "strong reasoning, broad context",
+      "provider": "<provider-id>",
       "model": "<reasoning-model-id>",
       "temperature": 0.7
     },
@@ -13,6 +20,7 @@
       "pipeline": "greenfield + legacy",
       "purpose": "contracts and behavioral examples; candidate specs in legacy mode",
       "profile": "strong reasoning",
+      "provider": "<provider-id>",
       "model": "<reasoning-model-id>",
       "temperature": 0.3
     },
@@ -20,6 +28,7 @@
       "pipeline": "shared",
       "purpose": "derive authorized tasks from validated contracts/issues",
       "profile": "reasoning",
+      "provider": "<provider-id>",
       "model": "<reasoning-model-id>",
       "temperature": 0.2
     },
@@ -27,6 +36,7 @@
       "pipeline": "shared",
       "purpose": "generate tests and authorized implementation changes",
       "profile": "coding; constrained by validated contracts/examples and task scope",
+      "provider": "<provider-id>",
       "model": "<coding-model-id>",
       "temperature": 0.2,
       "opencode_agent": "coder",
@@ -36,14 +46,16 @@
       "pipeline": "shared",
       "purpose": "implementation<->contract<->requirement fidelity and regression review",
       "profile": "medium-high reasoning",
+      "provider": "<provider-id>",
       "model": "<different-from-codegen>",
-      "constraint": "must differ from codegen",
+      "constraint": "must differ from codegen as a (provider, model) pair — see providers.reviewer_constraint_note",
       "temperature": 0.2
     },
     "librarian": {
       "pipeline": "shared",
       "purpose": "graph extraction/update, embeddings, todo compression, provenance",
       "profile": "small/economic, high volume",
+      "provider": "<provider-id>",
       "model": "<small-model-id>",
       "temperature": 0.0
     },
@@ -51,6 +63,7 @@
       "pipeline": "existing-project bootstrap",
       "purpose": "infer ObservedBehavior and candidate behavioral/semantic knowledge from repository evidence",
       "profile": "strong reasoning + code understanding",
+      "provider": "<provider-id>",
       "model": "<reasoning-code-model-id>",
       "temperature": 0.2,
       "hard_rule": "never mark inferred intent as validated"
@@ -59,6 +72,7 @@
       "pipeline": "maintenance",
       "purpose": "evaluate semantic impact of changed CodeUnit/ConfigUnit on candidate contracts",
       "profile": "strong reasoning + diff/code understanding",
+      "provider": "<provider-id>",
       "model": "<reasoning-code-model-id>",
       "temperature": 0.1,
       "hard_rule": "candidate selection starts from deterministic graph/static analysis; analyst does not silently shrink the safety set"
@@ -67,6 +81,7 @@
       "pipeline": "shared",
       "purpose": "assist Issue classification, evidence gathering and candidate links",
       "profile": "reasoning",
+      "provider": "<provider-id>",
       "model": "<reasoning-model-id>",
       "temperature": 0.2,
       "hard_rule": "classification does not authorize code modification"

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     neo4j_database: str = "neo4j"
 
     anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
 
     reqgraph_project_root: Path = Path(".")
 

@@ -19,6 +19,7 @@ pip install -e ".[dev]"                    # base install
 pip install -e ".[dev,embeddings,js]"      # + local embeddings, + JS/TS extraction (both optional)
 
 cp .env.example .env   # fill in ANTHROPIC_API_KEY for LLM-backed commands
+                        # (or OPENAI_API_KEY + REQGRAPH_PROVIDER=openai to use OpenAI instead — see .env.example)
 
 docker compose up -d neo4j
 graph-cli init --project "My Project" --mode greenfield --test-command "pytest -q"
@@ -40,6 +41,10 @@ level. `context`/`status` support `--json` for machine consumption — see
   Requires `init --with-vector` to actually create the Neo4j vector indexes.
 - `js` (`tree-sitter` + JS/TS grammars) — extends `bootstrap-scan`/`detect-changes` to
   JavaScript/TypeScript alongside Python, same symbol/call-graph granularity.
+- `llm-openai` (`openai`) — lets LLM roles run on OpenAI instead of (or alongside)
+  Anthropic. Each role picks its provider independently via `REQGRAPH_PROVIDER_<ROLE>`,
+  or move every role at once with `REQGRAPH_PROVIDER=openai`; per-role `REQGRAPH_MODEL_<ROLE>`
+  still wins over either. See `.env.example` for the full list of role names.
 
 Both degrade gracefully when not installed — the base install works exactly as before.
 
@@ -134,7 +139,7 @@ pytest tests/unit            # no external services required
 pytest -m integration        # requires the live Neo4j above
 ```
 
-Tests never call the real Anthropic API — LLM-backed commands are tested against a fake client
-(`tests/conftest.py`'s `fake_anthropic` fixture). The `embeddings`/`js` extras are exercised for
+Tests never call the real Anthropic or OpenAI APIs — LLM-backed commands are tested against a
+fake client (`tests/conftest.py`'s `fake_anthropic`/`fake_openai` fixtures). The `embeddings`/`js` extras are exercised for
 real when installed (`fastembed` downloads its model from Hugging Face Hub on first use — needs
 network once) rather than faked, since both run fully offline/local once available.

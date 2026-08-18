@@ -121,14 +121,54 @@ class FakeAnthropicClient:
 
 @pytest.fixture
 def fake_anthropic(monkeypatch):
-    """Patches reqgraph.llm.client.get_client to return a FakeAnthropicClient.
-    Call `fake_anthropic(responses=[...])` to configure the canned outputs.
+    """Patches reqgraph.llm.client.get_client to return a FakeAnthropicClient
+    for the 'anthropic' provider. Call `fake_anthropic(responses=[...])` to
+    configure the canned outputs.
     """
 
     def _install(responses):
         fake = FakeAnthropicClient(responses)
-        monkeypatch.setattr(llm_client_module, "get_client", lambda: fake)
-        monkeypatch.setattr(llm_invoke_module, "get_client", lambda: fake)
+        monkeypatch.setattr(llm_client_module, "get_client", lambda provider="anthropic": fake)
+        monkeypatch.setattr(llm_invoke_module, "get_client", lambda provider="anthropic": fake)
+        return fake
+
+    return _install
+
+
+class FakeResponses:
+    def __init__(self, responses):
+        # responses: list of pydantic model instances (or None to simulate a parse failure),
+        # consumed in order across calls.
+        self._responses = list(responses)
+        self.calls: list[dict] = []
+
+    def parse(self, **kwargs):
+        self.calls.append(kwargs)
+        if not self._responses:
+            raise AssertionError("FakeResponses.parse called more times than responses provided")
+        return FakeParsedResponse(self._responses.pop(0))
+
+
+class FakeParsedResponse:
+    def __init__(self, output_parsed):
+        self.output_parsed = output_parsed
+
+
+class FakeOpenAIClient:
+    def __init__(self, responses):
+        self.responses = FakeResponses(responses)
+
+
+@pytest.fixture
+def fake_openai(monkeypatch):
+    """Patches reqgraph.llm.client.get_client to return a FakeOpenAIClient for
+    the 'openai' provider — mirrors `fake_anthropic` but for `client.responses.parse`.
+    """
+
+    def _install(responses):
+        fake = FakeOpenAIClient(responses)
+        monkeypatch.setattr(llm_client_module, "get_client", lambda provider="anthropic": fake)
+        monkeypatch.setattr(llm_invoke_module, "get_client", lambda provider="anthropic": fake)
         return fake
 
     return _install

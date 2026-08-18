@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-mock", "ruff", "mypy", "freezegun"]
 embeddings = ["fastembed>=0.7"]
+llm-openai = ["openai>=2.0"]
 js = ["tree-sitter>=0.21", "tree-sitter-javascript>=0.21", "tree-sitter-typescript>=0.21"]
 api = ["fastapi>=0.115", "uvicorn>=0.32"]
 

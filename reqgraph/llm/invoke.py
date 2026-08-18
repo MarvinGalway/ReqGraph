@@ -12,13 +12,61 @@ from typing import Any, TypeVar
 from pydantic import BaseModel
 
 from reqgraph.llm.client import get_client
-from reqgraph.llm.roles import RoleConfig, resolve_model
+from reqgraph.llm.roles import RoleConfig, resolve_model, resolve_provider
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class RoleInvocationError(RuntimeError):
     pass
+
+
+def _invoke_once(
+    provider: str,
+    client: Any,
+    model: str,
+    role: RoleConfig,
+    system_prompt: str,
+    user_prompt: str,
+    output_model: type[T],
+    max_tokens: int,
+) -> T | None:
+    if provider == "anthropic":
+        kwargs: dict[str, Any] = {}
+        if role.effort:
+            kwargs["thinking"] = {"type": "adaptive"}
+            kwargs["output_config"] = {"effort": role.effort}
+        if role.temperature is not None:
+            kwargs["temperature"] = role.temperature
+        message = client.messages.parse(
+            model=model,
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+            output_format=output_model,
+            **kwargs,
+        )
+        return message.parsed_output
+    elif provider == "openai":
+        # Responses API structured-output parsing helper: `text_format=` mirrors
+        # Anthropic's `output_format=`, `reasoning.effort` takes the same literal
+        # values as `role.effort` (see roles.py docstring), and `.output_parsed`
+        # mirrors `.parsed_output`.
+        kwargs = {}
+        if role.effort:
+            kwargs["reasoning"] = {"effort": role.effort}
+        if role.temperature is not None:
+            kwargs["temperature"] = role.temperature
+        response = client.responses.parse(
+            model=model,
+            max_output_tokens=max_tokens,
+            instructions=system_prompt,
+            input=user_prompt,
+            text_format=output_model,
+            **kwargs,
+        )
+        return response.output_parsed
+    raise RoleInvocationError(f"Unknown LLM provider {provider!r} (supported: anthropic, openai)")
 
 
 def invoke_role(
@@ -35,27 +83,16 @@ def invoke_role(
     max_retries: int = 1,
 ) -> T:
     """`validate`, if given, returns an error string on gate failure or None on success."""
-    client = get_client()
+    provider = resolve_provider(role)
+    client = get_client(provider)
     model = resolve_model(role)
-    kwargs: dict[str, Any] = {}
-    if role.effort:
-        kwargs["thinking"] = {"type": "adaptive"}
-        kwargs["output_config"] = {"effort": role.effort}
-    if role.temperature is not None:
-        kwargs["temperature"] = role.temperature
 
     current_prompt = user_prompt
     last_error: str | None = None
     for _ in range(max_retries + 1):
-        message = client.messages.parse(
-            model=model,
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": current_prompt}],
-            output_format=output_model,
-            **kwargs,
+        parsed = _invoke_once(
+            provider, client, model, role, system_prompt, current_prompt, output_model, max_tokens
         )
-        parsed = message.parsed_output
         if parsed is None:
             last_error = "model response could not be parsed into the requested schema"
         elif validate is not None:
